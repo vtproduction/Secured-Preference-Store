@@ -22,40 +22,6 @@
             android:inputType="textCapWords"
             android:hint="text" />
 
-        <EditText
-            android:id="@+id/text_value_2"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:lines="2"
-            android:inputType="text"
-            android:hint="long text" />
-
-        <EditText
-            android:id="@+id/number_1"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:lines="1"
-            android:inputType="number"
-            android:hint="number"
-            android:layout_marginTop="8dp" />
-
-        <EditText
-            android:id="@+id/number_2"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:lines="1"
-            android:inputType="numberDecimal"
-            android:hint="decimal number" />
-
-        <EditText
-            android:id="@+id/date_1"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:lines="1"
-            android:inputType="datetime"
-            android:hint="date time"
-            android:layout_marginTop="8dp" />
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

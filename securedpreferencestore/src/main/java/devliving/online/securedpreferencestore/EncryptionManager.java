@@ -64,7 +64,6 @@ public class EncryptionManager {
     private final int GCM_TAG_LENGTH = 128;
 
     private final int COMPAT_IV_LENGTH = 16;
-    private final int IV_LENGTH = 12;
 
     private final static String DEFAULT_CHARSET = "UTF-8";
 
@@ -122,7 +121,7 @@ public class EncryptionManager {
 
     private String mKeyAliasPrefix;
 
-    private boolean isCompatMode = false;
+
 
     private Context mContext;
     SharedPreferences mPrefs;
@@ -186,8 +185,8 @@ public class EncryptionManager {
         AES_KEY_ALIAS = String.format("%s_%s", mKeyAliasPrefix, AES_KEY_ALIAS_NAME);
         MAC_KEY_ALIAS = String.format("%s_%s", mKeyAliasPrefix, MAC_KEY_ALIAS_NAME);
 
-        String isCompatKey = getHashed(IS_COMPAT_MODE_KEY_ALIAS);
-        isCompatMode = prefStore.getBoolean(isCompatKey, Build.VERSION.SDK_INT < Build.VERSION_CODES.M);
+
+
         mRecoveryHandler = recoveryHandler;
 
         mContext = context;
@@ -377,9 +376,9 @@ public class EncryptionManager {
     public EncryptedData encrypt(byte[] bytes) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, IOException, BadPaddingException, NoSuchProviderException, IllegalBlockSizeException, InvalidAlgorithmParameterException {
         if (bytes != null && bytes.length > 0) {
             byte[] IV = getIV();
-            if (isCompatMode)
+
                 return encryptAESCompat(bytes, IV);
-            else return encryptAES(bytes, IV);
+
         }
 
         return null;
@@ -401,9 +400,8 @@ public class EncryptionManager {
      */
     public byte[] decrypt(EncryptedData data) throws IOException, NoSuchPaddingException, InvalidAlgorithmParameterException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, InvalidMacException, NoSuchProviderException, InvalidKeyException {
         if (data != null && data.encryptedData != null) {
-            if (isCompatMode)
-                return decryptAESCompat(data);
-            else return decryptAES(data);
+            return decryptAESCompat(data);
+
         }
 
         return null;
@@ -468,7 +466,7 @@ public class EncryptionManager {
      */
     public void encrypt(BufferedInputStream fileIn, BufferedOutputStream fileOut) throws IOException, NoSuchProviderException, InvalidAlgorithmParameterException, NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException {
         byte[] IV = getIV();
-        Cipher cipher = isCompatMode ? getCipherAESCompat(IV, true) : getCipherAES(IV, true);
+        Cipher cipher =  getCipherAESCompat(IV, true);
         CipherOutputStream cipherOut = new CipherOutputStream(fileOut, cipher);
 
         //store IV
@@ -501,7 +499,7 @@ public class EncryptionManager {
      * @throws NoSuchPaddingException
      */
     public void decrypt(BufferedInputStream fileIn, BufferedOutputStream fileOut) throws IOException, NoSuchProviderException, InvalidAlgorithmParameterException, NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException {
-        int IVLength = isCompatMode ? COMPAT_IV_LENGTH : IV_LENGTH;
+        int IVLength = COMPAT_IV_LENGTH;
         byte[] IV = new byte[IVLength];
 
         int read = fileIn.read(IV, 0, IVLength);
@@ -510,7 +508,7 @@ public class EncryptionManager {
 
         //TODO: find a way to validate MAC iteratively without loading the whole file in memory
 
-        Cipher cipher = isCompatMode ? getCipherAESCompat(IV, false) : getCipherAES(IV, false);
+        Cipher cipher = getCipherAESCompat(IV, false);
         CipherInputStream cipherIn = new CipherInputStream(fileIn, cipher);
 
         byte[] buffer = new byte[4096];
@@ -576,13 +574,9 @@ public class EncryptionManager {
         mStore.load(null);
     }
 
-    byte[] getIV() throws UnsupportedEncodingException {
+    byte[] getIV()  {
         byte[] iv;
-        if (!isCompatMode) {
-            iv = new byte[IV_LENGTH];
-        } else {
-            iv = new byte[COMPAT_IV_LENGTH];
-        }
+        iv = new byte[COMPAT_IV_LENGTH];
         SecureRandom rng = new SecureRandom();
         rng.nextBytes(iv);
         return iv;
@@ -606,46 +600,9 @@ public class EncryptionManager {
         return cipher;
     }
 
-    /**
-     *
-     * @param bytes
-     * @param IV
-     * @return IV and Encrypted data
-     * @throws NoSuchPaddingException
-     * @throws NoSuchAlgorithmException
-     * @throws InvalidAlgorithmParameterException
-     * @throws InvalidKeyException
-     * @throws BadPaddingException
-     * @throws IllegalBlockSizeException
-     * @throws UnsupportedEncodingException
-     */
-    @TargetApi(Build.VERSION_CODES.KITKAT)
-    EncryptedData encryptAES(byte[] bytes, byte[] IV) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, UnsupportedEncodingException {
-        Cipher cipher = getCipherAES(IV, true);
-        EncryptedData result = new EncryptedData();
-        result.IV = cipher.getIV();
-        result.encryptedData = cipher.doFinal(bytes);
 
-        return result;
-    }
 
-    /**
-     *
-     * @param encryptedData - IV and Encrypted data
-     * @return decrypted data
-     * @throws NoSuchPaddingException
-     * @throws NoSuchAlgorithmException
-     * @throws InvalidAlgorithmParameterException
-     * @throws InvalidKeyException
-     * @throws BadPaddingException
-     * @throws IllegalBlockSizeException
-     * @throws UnsupportedEncodingException
-     */
-    @TargetApi(Build.VERSION_CODES.KITKAT)
-    byte[] decryptAES(EncryptedData encryptedData) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, UnsupportedEncodingException {
-        Cipher cipher = getCipherAES(encryptedData.IV, false);
-        return cipher.doFinal(encryptedData.encryptedData);
-    }
+
 
     Cipher getCipherAESCompat(byte[] IV, boolean modeEncrypt) throws NoSuchPaddingException, NoSuchAlgorithmException, NoSuchProviderException, InvalidAlgorithmParameterException, InvalidKeyException {
         Cipher c = Cipher.getInstance(AES_CIPHER_COMPAT, BOUNCY_CASTLE_PROVIDER);
@@ -678,67 +635,30 @@ public class EncryptionManager {
         return result;
     }
 
-    byte[] decryptAESCompat(EncryptedData encryptedData) throws UnsupportedEncodingException, NoSuchAlgorithmException, InvalidKeyException, NoSuchProviderException, NoSuchPaddingException, InvalidAlgorithmParameterException, BadPaddingException, IllegalBlockSizeException, InvalidMacException {
+    byte[] decryptAESCompat(EncryptedData encryptedData) throws NoSuchAlgorithmException, InvalidKeyException, NoSuchProviderException, NoSuchPaddingException, InvalidAlgorithmParameterException, BadPaddingException, IllegalBlockSizeException, InvalidMacException {
         if (verifyMac(encryptedData.mac, encryptedData.getDataForMacComputation())) {
             Cipher c = getCipherAESCompat(encryptedData.IV, false);
             return c.doFinal(encryptedData.encryptedData);
         } else throw new InvalidMacException();
     }
 
-    void loadKey(SharedPreferences prefStore) throws KeyStoreException, UnrecoverableEntryException, NoSuchAlgorithmException, NoSuchPaddingException, NoSuchProviderException, InvalidKeyException, IOException {
-        if (!isCompatMode) {
-            if (mStore.containsAlias(AES_KEY_ALIAS) && mStore.entryInstanceOf(AES_KEY_ALIAS, KeyStore.SecretKeyEntry.class)) {
-                KeyStore.SecretKeyEntry entry = (KeyStore.SecretKeyEntry) mStore.getEntry(AES_KEY_ALIAS, null);
-                aesKey = entry.getSecretKey();
-            }
-        } else {
-            aesKey = getFallbackAESKey(prefStore);
-            macKey = getMacKey(prefStore);
-        }
+    void loadKey(SharedPreferences prefStore) throws  NoSuchAlgorithmException, NoSuchPaddingException, NoSuchProviderException, InvalidKeyException, IOException {
+        aesKey = getFallbackAESKey(prefStore);
+        macKey = getMacKey(prefStore);
     }
 
     boolean generateKey(Context context, @Nullable byte[] seed, SharedPreferences prefStore) throws KeyStoreException, NoSuchProviderException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, UnrecoverableEntryException, NoSuchPaddingException, InvalidKeyException, IOException {
         boolean keyGenerated = false;
 
-        if (!isCompatMode) {
-            keyGenerated = generateAESKey(seed);
-        } else {
-            keyGenerated = generateRSAKeys(context, seed);
-            loadRSAKeys();
-            keyGenerated = generateFallbackAESKey(prefStore, seed) || keyGenerated;
-            keyGenerated = generateMacKey(prefStore, seed) || keyGenerated;
-        }
+        keyGenerated = generateRSAKeys(context, seed);
+        loadRSAKeys();
+        keyGenerated = generateFallbackAESKey(prefStore, seed) || keyGenerated;
+        keyGenerated = generateMacKey(prefStore, seed) || keyGenerated;
 
         return keyGenerated;
     }
 
-    @TargetApi(Build.VERSION_CODES.M)
-    boolean generateAESKey(@Nullable byte[] seed) throws KeyStoreException, NoSuchProviderException, NoSuchAlgorithmException, InvalidAlgorithmParameterException {
-        if (!mStore.containsAlias(AES_KEY_ALIAS)) {
-            KeyGenerator keyGen = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE_PROVIDER);
 
-            KeyGenParameterSpec spec = new KeyGenParameterSpec.Builder(AES_KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
-                    .setCertificateSubject(new X500Principal("CN = Secured Preference Store, O = Devliving Online"))
-                    .setCertificateSerialNumber(BigInteger.ONE)
-                    .setKeySize(AES_BIT_LENGTH)
-                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                    .setRandomizedEncryptionRequired(false) //TODO: set to true and let the Cipher generate a secured IV
-                    .build();
-            if(seed != null && seed.length > 0){
-                SecureRandom random = new SecureRandom(seed);
-                keyGen.init(spec, random);
-            } else {
-                keyGen.init(spec);
-            }
-
-            keyGen.generateKey();
-
-            return true;
-        }
-
-        return false;
-    }
 
     boolean generateFallbackAESKey(SharedPreferences prefStore, @Nullable byte[] seed) throws IOException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, KeyStoreException, NoSuchProviderException, UnrecoverableEntryException {
         String key = getHashed(AES_KEY_ALIAS);
@@ -850,25 +770,15 @@ public class EncryptionManager {
             Calendar end = Calendar.getInstance();
             end.add(Calendar.YEAR, 100);
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                spec = new KeyPairGeneratorSpec.Builder(context)
-                        .setAlias(RSA_KEY_ALIAS)
-                        .setKeySize(RSA_BIT_LENGTH)
-                        .setKeyType(KEY_ALGORITHM_RSA)
-                        .setSerialNumber(BigInteger.ONE)
-                        .setSubject(new X500Principal("CN = Secured Preference Store, O = Devliving Online"))
-                        .setStartDate(start.getTime())
-                        .setEndDate(end.getTime())
-                        .build();
-            } else {
-                spec = new KeyPairGeneratorSpec.Builder(context)
-                        .setAlias(RSA_KEY_ALIAS)
-                        .setSerialNumber(BigInteger.ONE)
-                        .setSubject(new X500Principal("CN = Secured Preference Store, O = Devliving Online"))
-                        .setStartDate(start.getTime())
-                        .setEndDate(end.getTime())
-                        .build();
-            }
+            spec = new KeyPairGeneratorSpec.Builder(context)
+                    .setAlias(RSA_KEY_ALIAS)
+                    .setKeySize(RSA_BIT_LENGTH)
+                    .setKeyType(KEY_ALGORITHM_RSA)
+                    .setSerialNumber(BigInteger.ONE)
+                    .setSubject(new X500Principal("CN = Secured Preference Store, O = Devliving Online"))
+                    .setStartDate(start.getTime())
+                    .setEndDate(end.getTime())
+                    .build();
 
             if(seed != null && seed.length > 0) {
                 SecureRandom random = new SecureRandom(seed);
@@ -907,7 +817,7 @@ public class EncryptionManager {
         return false;
     }
 
-    byte[] RSAEncrypt(byte[] bytes) throws KeyStoreException, UnrecoverableEntryException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IOException {
+    byte[] RSAEncrypt(byte[] bytes) throws  NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IOException {
         Cipher cipher = Cipher.getInstance(RSA_CIPHER, SSL_PROVIDER);
         cipher.init(Cipher.ENCRYPT_MODE, publicKey);
 
@@ -944,6 +854,15 @@ public class EncryptionManager {
         byte[] IV;
         byte[] encryptedData;
         byte[] mac;
+
+        @Override
+        public String toString() {
+            return "EncryptedData{" +
+                    "IV=" + Arrays.toString(IV) +
+                    ", encryptedData=" + Arrays.toString(encryptedData) +
+                    ", mac=" + Arrays.toString(mac) +
+                    '}';
+        }
 
         public EncryptedData() {
             IV = null;
